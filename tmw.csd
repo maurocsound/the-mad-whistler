@@ -34,12 +34,15 @@ nchnls = 2
 gixres      =   1024
 giyres      =   128
 
-giMinFrq    =   120
-giMaxFrq    =   3400
+giMinFrq    =   262
+giMaxFrq    =   4000
+
+giBlowVol   =   0.25
+giReverb    =   0.5
 
 ; GUI SECTION:
 ; ------------
-FLpanel "THE MAD WHISTLER v0.1 - (C)2018 by Mauro Giubileo", gixres, giyres, -1, -1, 3
+FLpanel "THE MAD WHISTLER v0.11 - (C)2018 by Mauro Giubileo", gixres, giyres, -1, -1, 3
 FLpanelEnd
 FLrun
 
@@ -53,6 +56,8 @@ FLrun
     ( ($x1 - ($a1)) / ($b1 - ($a1)) * ($b2 - ($a2)) + $a2 ) \
 #
 
+; INSTRUMENT SECTION:
+; -------------------
 
 instr 1
     koutx,  \
@@ -62,20 +67,38 @@ instr 1
     kamp    init    0
     kfrq    init    0
     
-    kouty   =       $SCALE('kouty' FROM: ['giyres / 5', 'giyres'] 
-                                     TO: ['0',          '0.5'   ])
+    ; get the amplitude and frequency values from the mouse position:
+    kouty   =       $SCALE( 'kouty' FROM: ['giyres / 5' --> 'giyres'] 
+                                      TO: ['0'          --> '0.5'   ] )
                            
     kouty   =       (kouty < 0)? 0 : kouty
     kamp    =       kamp * 0.95 + kouty * 0.05
     
-    koutx   =       $SCALE('koutx' FROM: ['0',        'gixres'  ] 
-                                     TO: ['giMinFrq', 'giMaxFrq'])
+    koutx   =       $SCALE( 'koutx' FROM: ['0'        --> 'gixres'  ] 
+                                      TO: ['giMinFrq' --> 'giMaxFrq'] )
                            
-    kfrq    =       kfrq * 0.99 + koutx * 0.01
+    kfrq    =       kfrq * 0.95 + koutx * 0.05
     
-    aout    oscili  kamp, kfrq
-    aout    reverb  aout / 4, 0.5
-            
+    ; the blow:
+    kRand   rand    1
+    aBlow   rand    kRand
+    aBlow   *=      kamp * kRand
+    
+    kBlwVol =       $SCALE( 'kfrq' FROM: ['giMinFrq' --> 'giMaxFrq'  ] 
+                                     TO: ['0'        --> '0.9'       ] )
+                                     
+    kBlwVol =       giBlowVol * (1 - kBlwVol)
+    aBlow   *=      kBlwVol                      
+    kBlwFrq max     320, kfrq * 0.5
+    aBlow   clfilt  aBlow, kBlwFrq, 0, 2
+    
+    ; the whistle:
+    aWhstl  oscili  kamp, kfrq
+    
+    ; the blow + the whistle + reverb:
+    aout    =       aBlow + aWhstl 
+    aout    reverb  aout / 4, giReverb
+    
             outs    aout, aout
 endin
 
